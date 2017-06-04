@@ -2,7 +2,7 @@
 extern crate lazy_static;
 extern crate regex;
 
-use std::fs::File;
+use std::fs::{File, metadata};
 use std::io::SeekFrom;
 use std::io::prelude::*;
 use std::io;
@@ -38,13 +38,22 @@ ScreenPrinting=false";
 
 fn tail_log(tx: Sender<parsers::LogEvent>) -> io::Result<()> {
     let hearthstone_path = Path::new(r"C:\Program Files (x86)\Hearthstone\Logs\Power.log");
-    let mut handle = io::BufReader::new(File::open(hearthstone_path)?);
+    let mut handle = io::BufReader::new(File::open(&hearthstone_path)?);
     handle.seek(SeekFrom::End(0))?;
+
+    let mut last_known_file_size = metadata(&hearthstone_path).unwrap().len();
 
     loop {
         let mut buffer = String::new();
         match handle.read_line(&mut buffer) {
             Ok(0) => {
+                let current_file_size = metadata(&hearthstone_path).unwrap().len();
+                if current_file_size < last_known_file_size {
+                    last_known_file_size = current_file_size;
+                    handle.seek(SeekFrom::Start(0)).unwrap();
+                    tx.send(parsers::LogEvent::PowerLogRecreated).unwrap();
+                }
+
                 thread::sleep(Duration::from_millis(250));
             }
             Ok(_) => {
@@ -67,12 +76,15 @@ fn main() {
     println!("Spawned log thread");
 
     println!("Start receiving events");
-
     let mut game_state = models::GameState::default();
     while let Ok(play) = rx.recv() {
         match play {
             parsers::LogEvent::GameComplete => {
-                print!("Game completed");
+                println!("Game completed");
+                game_state = models::GameState::default();
+            }
+            parsers::LogEvent::PowerLogRecreated => {
+                println!("PowerLog recreated");
                 game_state = models::GameState::default();
             }
             parsers::LogEvent::Play(play) => {

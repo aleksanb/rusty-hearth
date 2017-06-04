@@ -6,13 +6,14 @@ lazy_static! {
         r"^.*id=(?P<id>\d*) .*cardId=(?P<card_id>[a-zA-Z0-9_]*) .*player=(?P<player>\d*)")
             .unwrap();
     static ref GAME_COMPLETE_PATTERN: regex::Regex = regex::Regex::new(
-        r"^.*TAG_CHANGE Entity=GameEntity tag=STATE value=COMPLETE.*$")
+        r".*TAG_CHANGE Entity=GameEntity tag=STATE value=COMPLETE.*")
             .unwrap();
 }
 
 #[derive(Debug)]
 pub enum LogEvent {
     GameComplete,
+    PowerLogRecreated,
     Play(models::Play),
 }
 
