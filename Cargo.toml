@@ -2,6 +2,8 @@
 name = "rusty_hearth"
 version = "0.1.0"
 authors = ["Aleksander Vognild Burkow <aleksanderburkow@gmail.com>"]
+description = "Bare-bones hearthstone deck tracker written in rust"
+license = "AGPL-3.0"
 
 [dependencies]
 regex = "0.2.2"
