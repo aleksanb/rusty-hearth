@@ -28,7 +28,7 @@ ScreenPrinting=false";
     let hs_dir = Path::new(r"C:\Program Files (x86)\Hearthstone\log.config");
     if !hs_dir.exists() {
         let mut handle = File::create(hs_dir)?;
-        handle.write_all(log_config);
+        handle.write_all(log_config)?;
     }
 
     Ok(())
@@ -45,27 +45,32 @@ fn tail_log(tx: Sender<models::Play>) -> io::Result<()> {
             Ok(0) => {
                 continue;
             }
-            Ok(n) => {
-                println!("{:?}", parse_log_line(&b));
+            Ok(_) => {
+                match parse_log_line(&b) {
+                    Some(play) => tx.send(play).unwrap(),
+                    _ => (),
+                }
             }
             Err(err) => println!("Error!, {}", err),
         }
     }
-
-    Ok(())
 }
 
 fn parse_log_line(line: &str) -> Option<models::Play> {
     lazy_static! {
-        static ref card_update_pattern: regex::Regex = regex::Regex::new(r"^.*id=(?P<id>\d*) .*cardId=(?P<card_id>[a-zA-Z0-9_]*) .*player=(?P<player>\d*)").unwrap();
-        static ref game_complete_pattern: regex::Regex = regex::Regex::new(r"^.*TAG_CHANGE Entity=GameEntity tag=STATE value=COMPLETE.*$").unwrap();
+        static ref CARD_UPDATE_PATTERN: regex::Regex = regex::Regex::new(
+            r"^.*id=(?P<id>\d*) .*cardId=(?P<card_id>[a-zA-Z0-9_]*) .*player=(?P<player>\d*)")
+                .unwrap();
+        static ref GAME_COMPLETE_PATTERN: regex::Regex = regex::Regex::new(
+            r"^.*TAG_CHANGE Entity=GameEntity tag=STATE value=COMPLETE.*$")
+                .unwrap();
     }
 
-    if game_complete_pattern.is_match(line) {
+    if GAME_COMPLETE_PATTERN.is_match(line) {
         return None;
     }
 
-    card_update_pattern
+    CARD_UPDATE_PATTERN
         .captures(line)
         .and_then(|group| {
             let id = group.name("id").map(|m| m.as_str());
@@ -81,9 +86,7 @@ fn parse_log_line(line: &str) -> Option<models::Play> {
                          })
                 }
                 _ => None,
-            };
-
-            None
+            }
         })
 }
 
@@ -95,11 +98,17 @@ fn main() {
     let (tx, rx) = channel();
 
     println!("Spawning log thread");
-    let log_thread = thread::spawn(|| tail_log(tx));
+    thread::spawn(|| tail_log(tx));
     println!("Spawned log thread");
 
     println!("Start receiving events");
+
+    let mut game_state = models::GameState::default();
     while let Ok(play) = rx.recv() {
-        println!("{:?}", play);
+        let updated = game_state.handle_play(play);
+        if updated {
+            println!("New state: {:?}", game_state);
+            println!();
+        }
     }
 }

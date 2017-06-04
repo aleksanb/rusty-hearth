@@ -1,17 +1,25 @@
-#[derive(Debug)]
-pub struct Card {
-    pub card_id: String,
-    pub ids: Vec<String>,
-}
+use std::collections::{HashMap, HashSet};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Player {
-    pub deck: Vec<Card>,
+    pub deck: HashMap<String, HashSet<String>>,
 }
 
-#[derive(Debug)]
-pub struct PlayState {
-    pub players: [Player; 2],
+#[derive(Debug, Default)]
+pub struct GameState {
+    pub players: HashMap<String, Player>,
+}
+
+impl GameState {
+    pub fn handle_play(&mut self, play: Play) -> bool {
+        self.players
+            .entry(play.player)
+            .or_insert(Player::default())
+            .deck
+            .entry(play.card_id)
+            .or_insert(HashSet::default())
+            .insert(play.id)
+    }
 }
 
 #[derive(Debug)]
