@@ -1,15 +1,28 @@
+#![feature(plugin)]
+#![plugin(rocket_codegen)]
+
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
+extern crate rocket;
+extern crate rocket_contrib;
+extern crate serde;
+extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 use std::fs::{File, metadata};
 use std::io::SeekFrom;
 use std::io::prelude::*;
 use std::io;
 use std::path::Path;
+use std::sync::{Mutex, Arc};
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Duration;
+
+use rocket::State;
+use rocket_contrib::JSON;
 
 mod models;
 mod parsers;
@@ -36,64 +49,78 @@ ScreenPrinting=false";
     Ok(())
 }
 
-fn tail_log(tx: Sender<parsers::LogEvent>) -> io::Result<()> {
-    let hearthstone_path = Path::new(r"C:\Program Files (x86)\Hearthstone\Logs\Power.log");
+fn tail_log(hearthstone_path: &Path, tx: Sender<parsers::LogEvent>) -> io::Result<()> {
     let mut handle = io::BufReader::new(File::open(&hearthstone_path)?);
     handle.seek(SeekFrom::End(0))?;
 
-    let mut last_known_file_size = metadata(&hearthstone_path).unwrap().len();
+    let mut last_known_file_size = metadata(&hearthstone_path)?.len();
 
     loop {
         let mut buffer = String::new();
-        match handle.read_line(&mut buffer) {
-            Ok(0) => {
-                let current_file_size = metadata(&hearthstone_path).unwrap().len();
+        match handle.read_line(&mut buffer)? {
+            0 => {
+                let current_file_size = metadata(&hearthstone_path)?.len();
                 if current_file_size < last_known_file_size {
                     last_known_file_size = current_file_size;
-                    handle.seek(SeekFrom::Start(0)).unwrap();
+                    handle.seek(SeekFrom::Start(0))?;
                     tx.send(parsers::LogEvent::PowerLogRecreated).unwrap();
+                } else {
+                    thread::sleep(Duration::from_millis(250));
                 }
-
-                thread::sleep(Duration::from_millis(250));
             }
-            Ok(_) => {
+            _ => {
                 parsers::parse_log_line(&buffer).map(|play| tx.send(play).unwrap());
             }
-            Err(err) => println!("Error!, {}", err),
         }
     }
 }
 
+#[get("/")]
+fn root(game_state: State<Arc<Mutex<models::GameState>>>) -> JSON<models::GameState> {
+    let game_state = game_state.lock().unwrap();
+    JSON(game_state.clone())
+}
+
 fn main() {
-    println!("Initializing log config");
-    init_log().unwrap();
-    println!("Initialized log config");
+    init_log().expect("log.config should be initialized");
+
+    let hearthstone_path = Path::new(r"C:\Program Files (x86)\Hearthstone\Logs\Power.log");
+
+    let mut game_state = Arc::new(Mutex::new(models::GameState::default()));
+    let mut consumer_game_state = game_state.clone();
 
     let (tx, rx) = channel();
 
-    println!("Spawning log thread");
-    thread::spawn(|| tail_log(tx));
-    println!("Spawned log thread");
+    thread::spawn(move || {
+                      println!("Producer thread started");
+                      tail_log(hearthstone_path, tx).expect("Log should be tailed");
+                      println!("Producerr thread stopped");
+                  });
 
-    println!("Start receiving events");
-    let mut game_state = models::GameState::default();
-    while let Ok(play) = rx.recv() {
-        match play {
-            parsers::LogEvent::GameComplete => {
-                println!("Game completed");
-                game_state = models::GameState::default();
-            }
-            parsers::LogEvent::PowerLogRecreated => {
-                println!("PowerLog recreated");
-                game_state = models::GameState::default();
-            }
-            parsers::LogEvent::Play(play) => {
-                let updated = game_state.handle_play(play);
-                if updated {
-                    println!("New state: {:?}", game_state);
-                    println!();
+    thread::spawn(move || {
+        println!("Consumer thread started");
+        while let Ok(play) = rx.recv() {
+            match play {
+                parsers::LogEvent::GameComplete |
+                parsers::LogEvent::PowerLogRecreated => {
+                    println!("Reseting GameState: {:?}", play);
+
+                    *consumer_game_state.lock().unwrap() = models::GameState::default();
+                }
+                parsers::LogEvent::Play(play) => {
+                    if consumer_game_state.lock().unwrap().handle_play(play) {
+                        println!("New state: {:?}", *consumer_game_state.lock().unwrap());
+                        println!();
+                    }
                 }
             }
         }
-    }
+
+        println!("Consumer thread stopped");
+    });
+
+    rocket::ignite()
+        .mount("/", routes![root])
+        .manage(game_state.clone())
+        .launch();
 }

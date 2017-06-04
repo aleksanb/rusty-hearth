@@ -1,11 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Clone)]
 pub struct Player {
     pub deck: HashMap<String, HashSet<String>>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Clone)]
 pub struct GameState {
     pub players: HashMap<String, Player>,
 }
