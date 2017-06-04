@@ -1,5 +1,5 @@
 [package]
-name = "hearthstone"
+name = "rusty_hearth"
 version = "0.1.0"
 authors = ["Aleksander Vognild Burkow <aleksanderburkow@gmail.com>"]
 
