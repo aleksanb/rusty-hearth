@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::io::SeekFrom;
+use std::time::Duration;
 
 mod models;
 
@@ -43,7 +44,7 @@ fn tail_log(tx: Sender<models::Play>) -> io::Result<()> {
         let mut b = String::new();
         match handle.read_line(&mut b) {
             Ok(0) => {
-                continue;
+                thread::sleep(Duration::from_millis(250));
             }
             Ok(_) => {
                 match parse_log_line(&b) {
