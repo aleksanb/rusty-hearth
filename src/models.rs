@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, Arc};
 
 #[derive(Debug, Default, Serialize, Clone)]
 pub struct Player {
@@ -21,6 +22,8 @@ impl GameState {
             .insert(play.id)
     }
 }
+
+pub type ThreadsafeGameState = Arc<Mutex<GameState>>;
 
 #[derive(Debug)]
 pub struct Play {
