@@ -65,7 +65,8 @@ fn parse_log_line(line: &str) -> Option<models::Play> {
         return None;
     }
 
-    card_update_pattern.captures(line)
+    card_update_pattern
+        .captures(line)
         .and_then(|group| {
             let id = group.name("id").map(|m| m.as_str());
             let card_id = group.name("card_id").map(|m| m.as_str());
@@ -73,8 +74,12 @@ fn parse_log_line(line: &str) -> Option<models::Play> {
 
             match (id, card_id, player) {
                 (Some(id), Some(card_id), Some(player)) if card_id != "" => {
-                    Some(models::Play { id: id.to_string(), card_id: card_id.to_string(), player: player.to_string() })
-                },
+                    Some(models::Play {
+                             id: id.to_string(),
+                             card_id: card_id.to_string(),
+                             player: player.to_string(),
+                         })
+                }
                 _ => None,
             };
 
@@ -90,7 +95,7 @@ fn main() {
     let (tx, rx) = channel();
 
     println!("Spawning log thread");
-    let log_thread = thread::spawn(|| tail_log(tx) );
+    let log_thread = thread::spawn(|| tail_log(tx));
     println!("Spawned log thread");
 
     println!("Start receiving events");
