@@ -33,7 +33,7 @@ fn main() {
     let hearthstone_log_config = Path::new(r"C:\Program Files (x86)\Hearthstone\log.config");
     let hearthstone_path = Path::new(r"C:\Program Files (x86)\Hearthstone\Logs\Power.log");
 
-    init_log(&hearthstone_log_config).expect("log.config should initialize correctly");
+    init_log(hearthstone_log_config).expect("log.config should initialize correctly");
 
     let (tx, rx) = mpsc::channel();
     let game_state = ThreadsafeGameState::default();
@@ -41,7 +41,7 @@ fn main() {
 
     thread::spawn(move || {
                       println!("Producer thread started");
-                      tail_log(hearthstone_path, tx).expect("Log should be tailed");
+                      tail_log(hearthstone_path, &tx).expect("Log should be tailed");
                       println!("Producerr thread stopped");
                   });
 

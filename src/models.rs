@@ -15,10 +15,10 @@ impl GameState {
     pub fn handle_play(&mut self, play: Play) -> bool {
         self.players
             .entry(play.player)
-            .or_insert(Player::default())
+            .or_insert_with(Player::default)
             .deck
             .entry(play.card_id)
-            .or_insert(HashSet::default())
+            .or_insert_with(HashSet::default)
             .insert(play.id)
     }
 }

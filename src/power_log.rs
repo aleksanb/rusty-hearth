@@ -30,7 +30,7 @@ ScreenPrinting=false";
     Ok(())
 }
 
-pub fn tail_log(hearthstone_path: &Path, tx: Sender<parsers::LogEvent>) -> io::Result<()> {
+pub fn tail_log(hearthstone_path: &Path, tx: &Sender<parsers::LogEvent>) -> io::Result<()> {
     let mut handle = io::BufReader::new(File::open(&hearthstone_path)?);
     handle.seek(SeekFrom::End(0))?;
 
